@@ -20,6 +20,7 @@
 #include <linux/uaccess.h>
 #include <linux/mm_inline.h>
 #include <linux/ctype.h>
+#include <linux/sched/signal.h>
 
 #include <asm/elf.h>
 #include <asm/tlb.h>
@@ -1706,6 +1707,9 @@ cont:
 
 		page = vm_normal_page(vma, addr, ptent);
 		if (!page)
+			continue;
+
+		if (!PageLRU(page))
 			continue;
 
 		if (page_mapcount(page) != 1)
