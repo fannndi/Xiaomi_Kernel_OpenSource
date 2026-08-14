@@ -82,6 +82,7 @@ struct qg_dt {
 	bool			tcss_enable;
 	bool			software_optimize_ffc_qg_iterm;
 	bool			bass_enable;
+	bool			disable_hold_full;
 };
 
 struct qg_esr_data {

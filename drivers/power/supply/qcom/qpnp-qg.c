@@ -4540,6 +4540,9 @@ static int qg_parse_dt(struct qpnp_qg *chip)
 	chip->dt.hold_soc_while_full = of_property_read_bool(node,
 					"qcom,hold-soc-while-full");
 
+	chip->dt.disable_hold_full = of_property_read_bool(node,
+					"qcom,disable-hold-full");
+
 	chip->dt.linearize_soc = of_property_read_bool(node,
 					"qcom,linearize-soc");
 
