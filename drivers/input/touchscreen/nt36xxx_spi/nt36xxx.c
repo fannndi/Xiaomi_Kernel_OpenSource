@@ -38,6 +38,8 @@
 
 #include "nt36xxx.h"
 //#include <linux/spi/spi-geni-qcom.h>
+
+extern void touch_irq_boost(void);
 #if NVT_TOUCH_ESD_PROTECT
 #include <linux/jiffies.h>
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
@@ -1367,6 +1369,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 #endif /* MT_PROTOCOL_B */
 	int32_t i = 0;
 	int32_t finger_cnt = 0;
+
+	touch_irq_boost();
 
 #if WAKEUP_GESTURE
 #ifdef CONFIG_PM
