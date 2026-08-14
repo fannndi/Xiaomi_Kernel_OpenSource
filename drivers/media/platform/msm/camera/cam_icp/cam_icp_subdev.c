@@ -206,6 +206,9 @@ static int cam_icp_probe(struct platform_device *pdev)
 	cam_smmu_set_client_page_fault_handler(iommu_hdl,
 		cam_icp_dev_iommu_fault_handler, node);
 
+	//add by xiaomi
+	cam_smmu_mi_init(iommu_hdl);
+
 	g_icp_dev.open_cnt = 0;
 	mutex_init(&g_icp_dev.icp_lock);
 
