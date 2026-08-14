@@ -27,7 +27,7 @@ static const struct file_operations proc_cpuinfo_operations = {
 static int cpumaxfreq_show(struct seq_file *m, void *v)
 {
 	uint32_t hw_type = get_hw_version_platform();
-	if(HARDWARE_PLATFORM_SWEET   == hw_type)
+	if(HARDWARE_PLATFORM_SURYA   == hw_type)
 		seq_printf(m, "2.3\n");
 	else
 		seq_printf(m, "2.2\n");
