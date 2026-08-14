@@ -33,6 +33,7 @@
 #include <soc/qcom/watchdog.h>
 #include <linux/dma-mapping.h>
 #include <linux/sched/clock.h>
+#include <linux/sched/debug.h>
 #include <linux/cpumask.h>
 #include <uapi/linux/sched/types.h>
 
@@ -202,12 +203,16 @@ static int panic_wdog_handler(struct notifier_block *this,
 		/* Make sure watchdog is enabled before notifying the caller */
 		mb();
 	} else {
-		__raw_writel(WDT_HZ * (panic_timeout + 10),
+		__raw_writel(WDT_HZ * (panic_timeout + 30),
 				wdog_dd->base + WDT0_BARK_TIME);
-		__raw_writel(WDT_HZ * (panic_timeout + 10),
+		__raw_writel(WDT_HZ * (panic_timeout + 30),
 				wdog_dd->base + WDT0_BITE_TIME);
 		__raw_writel(1, wdog_dd->base + WDT0_RST);
 	}
+#ifdef CONFIG_DUMP_ALL_STACKS
+	printk(KERN_INFO "D Status stack trace dump:\n");
+	show_state_filter(TASK_UNINTERRUPTIBLE);
+#endif
 	return NOTIFY_DONE;
 }
 
@@ -542,6 +547,8 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	nanosec_rem = do_div(wdog_dd->last_pet, 1000000000);
 	dev_info(wdog_dd->dev, "Watchdog last pet at %lu.%06lu\n",
 			(unsigned long) wdog_dd->last_pet, nanosec_rem / 1000);
+	show_state_filter(TASK_UNINTERRUPTIBLE);
+
 	if (wdog_dd->do_ipi_ping)
 		dump_cpu_alive_mask(wdog_dd);
 	msm_trigger_wdog_bite();
@@ -746,7 +753,7 @@ static void init_watchdog_data(struct msm_watchdog_data *wdog_dd)
 	configure_bark_dump(wdog_dd);
 	timeout = (wdog_dd->bark_time * WDT_HZ)/1000;
 	__raw_writel(timeout, wdog_dd->base + WDT0_BARK_TIME);
-	__raw_writel(timeout + 3*WDT_HZ, wdog_dd->base + WDT0_BITE_TIME);
+	__raw_writel(timeout + 10*WDT_HZ, wdog_dd->base + WDT0_BITE_TIME);
 
 	wdog_dd->panic_blk.notifier_call = panic_wdog_handler;
 	atomic_notifier_chain_register(&panic_notifier_list,
