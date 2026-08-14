@@ -3574,6 +3574,46 @@ static int qg_load_battery_profile(struct qpnp_qg *chip)
 			chip->bp.batt_type_str, chip->bp.float_volt_uv,
 			chip->bp.fastchg_curr_ma);
 
+	chip->dt.temp_comp_enable = of_property_read_bool(profile_node,
+				"qcom,temp-comp-enable");
+	if (chip->dt.temp_comp_enable) {
+		rc = of_property_read_u32(profile_node, "qcom,temp-comp-hysteresis",
+				&chip->dt.temp_comp_hysteresis);
+		if (rc < 0)
+			chip->dt.temp_comp_hysteresis = -EINVAL;
+		rc = of_property_read_u32(profile_node, "qcom,max-temp-comp",
+				&chip->dt.max_temp_comp_value);
+		if (rc < 0)
+			chip->dt.max_temp_comp_value = -EINVAL;
+
+		if (of_find_property(profile_node, "qcom,temp-comp-ranges", &len)) {
+			len /= sizeof(u32);
+			tuple_len = len / (sizeof(struct range_data) / sizeof(u32));
+			if (tuple_len <= 0 || tuple_len > MAX_STEP_CHG_ENTRIES)
+				return -EINVAL;
+
+			chip->dt.temp_comp_cfg =
+				kcalloc(len, sizeof(*chip->dt.temp_comp_cfg), GFP_KERNEL);
+			if (!chip->dt.temp_comp_cfg)
+				return -ENOMEM;
+
+			rc = read_range_data_from_node(profile_node,
+					"qcom,temp-comp-ranges",
+					chip->dt.temp_comp_cfg,
+					chip->dt.max_temp_comp_value,
+					chip->dt.max_temp_comp_value);
+			if (rc < 0) {
+				pr_err("Error in reading qcom,temp-comp-ranges rc=%d\n", rc);
+				kfree(chip->dt.temp_comp_cfg);
+				chip->dt.temp_comp_cfg = NULL;
+				return rc;
+			}
+
+			chip->dt.temp_comp_cfg_valid = true;
+			chip->dt.temp_comp_num = tuple_len;
+		}
+	}
+
 	return 0;
 }
 
@@ -5030,6 +5070,10 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
+
+	chip->report_temp = INT_MIN;
+	chip->batt_fake_temp = -1;
+	chip->step_index = -EINVAL;
 
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	chip->battery_authentic_result = -EINVAL;
