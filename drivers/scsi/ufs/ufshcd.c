@@ -221,10 +221,10 @@ static void ufshcd_update_uic_error_cnt(struct ufs_hba *hba, u32 reg, int type)
 /* Query request retries */
 #define QUERY_REQ_RETRIES 3
 /* Query request timeout */
-#define QUERY_REQ_TIMEOUT 1500 /* 1.5 seconds */
+#define QUERY_REQ_TIMEOUT 3000 /* 3.0 seconds */
 
 /* Task management command timeout */
-#define TM_CMD_TIMEOUT	100 /* msecs */
+#define TM_CMD_TIMEOUT	500 /* msecs */
 
 /* maximum number of retries for a general UIC command  */
 #define UFS_UIC_COMMAND_RETRIES 3
@@ -425,6 +425,8 @@ static struct ufs_dev_fix ufs_fixups[] = {
 	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
+		UFS_DEVICE_QUIRK_WAIT_AFTER_REF_CLK_UNGATE),
+	UFS_FIX(UFS_VENDOR_MICRON, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_WAIT_AFTER_REF_CLK_UNGATE),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, "hB8aL1",
 		UFS_DEVICE_QUIRK_HS_G1_TO_HS_G3_SWITCH),
@@ -1754,7 +1756,7 @@ out:
 
 static int ufshcd_clock_scaling_prepare(struct ufs_hba *hba)
 {
-	#define DOORBELL_CLR_TOUT_US		(1000 * 1000) /* 1 sec */
+	#define DOORBELL_CLR_TOUT_US		(40*1000*1000) /* 40 sec */
 	int ret = 0;
 	/*
 	 * make sure that there are no outstanding requests when
@@ -5607,6 +5609,7 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 	int err;
 	bool flag_res = 1;
 	ktime_t timeout;
+	bool timeout_warn = false;
 
 	err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_SET_FLAG,
 		QUERY_FLAG_IDN_FDEVICEINIT, NULL);
@@ -5621,14 +5624,14 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 	 * Some vendor devices are taking longer time to complete its internal
 	 * initialization, so set fDeviceInit flag poll time to 5 secs
 	 */
-	timeout = ktime_add_ms(ktime_get(), 5000);
+	timeout = ktime_add_ms(ktime_get(), 8000);
 
 	/* poll for max. 5sec for fDeviceInit flag to clear */
 	while (1) {
-		bool timedout = ktime_after(ktime_get(), timeout);
+		timeout_warn = ktime_after(ktime_get(), timeout);
 		err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_READ_FLAG,
 					QUERY_FLAG_IDN_FDEVICEINIT, &flag_res);
-		if (err || !flag_res || timedout)
+		if (err || !flag_res || timeout_warn)
 			break;
 
 		/*
@@ -5641,7 +5644,10 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 		else
 			i++;
 	}
-
+	if (timeout_warn)
+		dev_err(hba->dev,
+			"%s reading fDeviceInit flag timeout.\n",
+			__func__);
 	if (err)
 		dev_err(hba->dev,
 			"%s reading fDeviceInit flag failed with error %d\n",
@@ -8572,7 +8578,6 @@ static void ufshcd_def_desc_sizes(struct ufs_hba *hba)
 	hba->desc_size.conf_desc = QUERY_DESC_CONFIGURATION_DEF_SIZE;
 	hba->desc_size.unit_desc = QUERY_DESC_UNIT_DEF_SIZE;
 	hba->desc_size.geom_desc = QUERY_DESC_GEOMETRY_DEF_SIZE;
-	hba->desc_size.hlth_desc = QUERY_DESC_HEALTH_DEF_SIZE;
 }
 
 static void ufshcd_apply_pm_quirks(struct ufs_hba *hba)
