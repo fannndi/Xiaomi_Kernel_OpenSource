@@ -29,10 +29,10 @@
 
 #define DEFAULT_UPDATE_TIME_MS			64000
 #define SOC_SCALE_HYST_MS			2000
-#define VBAT_LOW_HYST_UV			50000
+#define VBAT_LOW_HYST_UV			5000
 #define FULL_SOC				100
 
-static int qg_delta_soc_interval_ms = 20000;
+static int qg_delta_soc_interval_ms = 40000;
 module_param_named(
 	soc_interval_ms, qg_delta_soc_interval_ms, int, 0600
 );
@@ -42,7 +42,7 @@ module_param_named(
 	fvss_soc_interval_ms, qg_fvss_delta_soc_interval_ms, int, 0600
 );
 
-static int qg_delta_soc_cold_interval_ms = 60000;
+static int qg_delta_soc_cold_interval_ms = 25000;
 module_param_named(
 	soc_cold_interval_ms, qg_delta_soc_cold_interval_ms, int, 0600
 );
@@ -307,7 +307,7 @@ int qg_adjust_sys_soc(struct qpnp_qg *chip)
 
 	if (chip->sys_soc == QG_MAX_SOC) {
 		soc = FULL_SOC;
-	} else if (chip->sys_soc >= (QG_MAX_SOC - 100)) {
+	} else if (chip->sys_soc >= (QG_MAX_SOC - 100) && !chip->dt.disable_hold_full) {
 		/* Hold SOC to 100% if we are dropping from 100 to 99 */
 		if (chip->last_adj_ssoc == FULL_SOC)
 			soc = FULL_SOC;
