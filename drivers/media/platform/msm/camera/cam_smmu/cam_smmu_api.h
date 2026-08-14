@@ -89,6 +89,7 @@ struct cam_smmu_region_info {
  * @return Status of operation. Negative in case of error. Zero otherwise.
  */
 int cam_smmu_get_handle(char *identifier, int *handle_ptr);
+int cam_smmu_mi_init(int handle);
 
 /**
  * @brief       : Performs IOMMU operations

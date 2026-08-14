@@ -2048,6 +2048,43 @@ int cam_smmu_get_handle(char *identifier, int *handle_ptr)
 }
 EXPORT_SYMBOL(cam_smmu_get_handle);
 
+extern int iommu_dma_set(struct device *dev, const char *name, bool best_fit);
+
+int cam_smmu_mi_init(int handle)
+{
+	int ret = 0, idx;
+	struct cam_context_bank_info *cb;
+
+	if (handle == HANDLE_INIT) {
+		CAM_ERR(CAM_SMMU, "Error: Invalid handle");
+		return -EINVAL;
+	}
+
+	idx = GET_SMMU_TABLE_IDX(handle);
+	if (idx < 0 || idx >= iommu_cb_set.cb_num) {
+		CAM_ERR(CAM_SMMU, "Error: Index invalid. idx = %d hdl = %x",
+			idx, handle);
+		return -EINVAL;
+	}
+
+	mutex_lock(&iommu_cb_set.cb_info[idx].lock);
+	if (iommu_cb_set.cb_info[idx].handle != handle) {
+		CAM_ERR(CAM_SMMU,
+			"Error: hdl is not valid, table_hdl = %x, hdl = %x",
+			iommu_cb_set.cb_info[idx].handle, handle);
+		mutex_unlock(&iommu_cb_set.cb_info[idx].lock);
+		return -EINVAL;
+	}
+
+	cb = &iommu_cb_set.cb_info[idx];
+	iommu_dma_set(cb->dev, cb->name, true);
+
+	mutex_unlock(&iommu_cb_set.cb_info[idx].lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(cam_smmu_mi_init);
+
 int cam_smmu_ops(int handle, enum cam_smmu_ops_param ops)
 {
 	int ret = 0, idx;

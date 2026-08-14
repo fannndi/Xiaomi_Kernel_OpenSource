@@ -16,6 +16,7 @@
 #include <linux/rbtree.h>
 #include <linux/atomic.h>
 #include <linux/dma-mapping.h>
+#include <linux/radix-tree.h>
 
 /* iova structure */
 struct iova {
@@ -94,7 +95,12 @@ struct iova_domain {
 						   flush-queues */
 	atomic_t fq_timer_on;			/* 1 when timer is active, 0
 						   when not */
+
+	struct radix_tree_root rdroot;
+	bool best_fit;
 };
+
+void iommu_debug_init(struct iova_domain *iovad, const char *name);
 
 static inline unsigned long iova_size(struct iova *iova)
 {
