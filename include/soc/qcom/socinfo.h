@@ -178,6 +178,7 @@
 
 #define SMEM_IMAGE_VERSION_TABLE	469
 #define SMEM_HW_SW_BUILD_ID		137
+#define SMEM_ID_VENDOR1			135
 enum msm_cpu {
 	MSM_CPU_UNKNOWN = 0,
 	MSM_CPU_8960,
@@ -258,6 +259,32 @@ uint32_t socinfo_get_platform_version(void);
 uint32_t socinfo_get_serial_number(void);
 enum pmic_model socinfo_get_pmic_model(void);
 uint32_t socinfo_get_pmic_die_revision(void);
+
+#define HARDWARE_PLATFORM_UNKNOWN 0
+#define HARDWARE_PLATFORM_SURYA   1
+#define HW_MAJOR_VERSION_SHIFT 16
+#define HW_MAJOR_VERSION_MASK  0xFFFF0000
+#define HW_MINOR_VERSION_SHIFT 0
+#define HW_MINOR_VERSION_MASK  0x0000FFFF
+#define HW_COUNTRY_VERSION_MASK 0xFFF00000
+#define HW_COUNTRY_VERSION_SHIFT 20
+#define HW_BUILD_VERSION_MASK 0x000F0000
+#define HW_BUILD_VERSION_SHIFT 16
+
+typedef enum {
+	CountryCN = 0,
+	CountryGlobal = 1,
+	CountryIndia = 2,
+	TELCO_VDF = 3,
+	INVALID,
+} CountryType;
+
+uint32_t get_hw_version_platform(void);
+uint32_t get_hw_country_version(void);
+uint32_t get_hw_version_major(void);
+uint32_t get_hw_version_minor(void);
+uint32_t get_hw_version_build(void);
+int get_platform_hwversion(char *buf, int len);
 int __init socinfo_init(void) __must_check;
 
 #endif
