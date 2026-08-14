@@ -226,7 +226,6 @@ struct qpnp_qg {
 	int			report_temp;
 	int			obj_temp;
 	int			batt_ntc_comp;
-	int			charge_status;
 	int			step_index;
 
 	/* DT */
