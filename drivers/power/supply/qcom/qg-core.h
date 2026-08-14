@@ -83,6 +83,12 @@ struct qg_dt {
 	bool			software_optimize_ffc_qg_iterm;
 	bool			bass_enable;
 	bool			disable_hold_full;
+	bool			temp_comp_enable;
+	int			temp_comp_hysteresis;
+	int			max_temp_comp_value;
+	struct range_data	*temp_comp_cfg;
+	bool			temp_comp_cfg_valid;
+	int			temp_comp_num;
 };
 
 struct qg_esr_data {
@@ -213,6 +219,15 @@ struct qpnp_qg {
 	int			batt_age_level;
 	struct alarm		alarm_timer;
 	u32			sdam_data[SDAM_MAX];
+
+	int			last_ibat;
+	int			real_temp;
+	int			batt_fake_temp;
+	int			report_temp;
+	int			obj_temp;
+	int			batt_ntc_comp;
+	int			charge_status;
+	int			step_index;
 
 	/* DT */
 	struct qg_dt		dt;

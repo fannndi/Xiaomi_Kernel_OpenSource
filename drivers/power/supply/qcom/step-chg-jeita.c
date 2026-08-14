@@ -440,7 +440,7 @@ reschedule:
 
 }
 
-static int get_val(struct range_data *range, int hysteresis, int current_index,
+int get_val(struct range_data *range, int hysteresis, int current_index,
 		int threshold,
 		int *new_index, int *val)
 {
@@ -528,6 +528,7 @@ static int get_val(struct range_data *range, int hysteresis, int current_index,
 	}
 	return 0;
 }
+EXPORT_SYMBOL(get_val);
 
 #define TAPERED_STEP_CHG_FCC_REDUCTION_STEP_MA		50000 /* 50 mA */
 static void taper_fcc_step_chg(struct step_chg_info *chip, int index,
