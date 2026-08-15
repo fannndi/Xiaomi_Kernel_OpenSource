@@ -773,6 +773,11 @@
 			<0x0078607c 0x4>;
 		reg-names = "sn-base","fuse-state";
 	};
+	sec_boot_fuse: secbootfuse@0x780460 {
+		compatible = "qcom,sec-boot-fuse";
+		reg = <0x780460 0x4>;
+		reg-names = "sec-boot-base";
+	};
 	cpu_feature_id: cpufeatureid@0x00784130 {
 		compatible = "qcom,cpu-feature-id";
 		reg = <0x00784130 0x4>;
