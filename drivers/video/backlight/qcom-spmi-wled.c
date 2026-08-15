@@ -434,6 +434,14 @@ static int wled5_set_brightness(struct wled *wled, u16 brightness)
 	u16 low_limit = wled->max_brightness * 1 / 1000;
 	u8 val, v[2], brightness_msb_mask;
 
+#define WLED_CABC_THR 200
+	if (brightness < WLED_CABC_THR) {
+		wled->cabc_config(wled, false);
+		brightness = brightness * 0x0B6C / 0xFFF;
+	} else {
+		wled->cabc_config(wled, true);
+	}
+
 	/* WLED5's lower limit is 0.1% */
 	if (brightness > 0 && brightness < low_limit)
 		brightness = low_limit;
@@ -514,13 +522,6 @@ static int wled_update_status(struct backlight_device *bl)
 
 	mutex_lock(&wled->lock);
 	if (brightness) {
-
-		if(brightness <= 40){
-			rc = wled5_cabc_config(wled, false);
-		}else if(brightness > 150){
-			rc = wled5_cabc_config(wled, true);
-		}
-
 		rc = wled_set_brightness(wled, brightness);
 		if (rc < 0) {
 			pr_err("wled failed to set brightness rc:%d\n", rc);
