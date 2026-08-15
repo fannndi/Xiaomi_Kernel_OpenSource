@@ -773,6 +773,11 @@
 			<0x0078607c 0x4>;
 		reg-names = "sn-base","fuse-state";
 	};
+	cpu_feature_id: cpufeatureid@0x00784130 {
+		compatible = "qcom,cpu-feature-id";
+		reg = <0x00784130 0x4>;
+		reg-names = "cpu-feature-id";
+	};
 	intc: interrupt-controller@17a00000 {
 		compatible = "arm,gic-v3";
 		#interrupt-cells = <3>;
