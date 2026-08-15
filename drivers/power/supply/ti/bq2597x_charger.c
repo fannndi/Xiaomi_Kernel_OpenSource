@@ -1044,7 +1044,7 @@ static int bq2597x_get_adc_data(struct bq2597x *bq, int channel,  int *result)
 	u16 val;
 	s16 t;
 
-	if (channel > ADC_MAX_NUM)
+	if (channel < 0 || channel >= ADC_MAX_NUM)
 		return -EINVAL;
 
 	ret = bq2597x_read_word(bq, ADC_REG_BASE + (channel << 1), &val);
@@ -1067,7 +1067,7 @@ static int bq2597x_set_adc_scan(struct bq2597x *bq, int channel, bool enable)
 	u8 shift;
 	u8 val;
 
-	if (channel > ADC_MAX_NUM)
+	if (channel < 0 || channel >= ADC_MAX_NUM)
 		return -EINVAL;
 
 	if (channel == ADC_IBUS) {
