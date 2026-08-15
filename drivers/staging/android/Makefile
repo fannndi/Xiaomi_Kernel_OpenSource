@@ -1,4 +1,5 @@
 ccflags-y += -I$(src)			# needed for trace events
+obj-$(CONFIG_MIGT)			+= migt.o
 
 obj-y					+= ion/
 
