@@ -1750,6 +1750,7 @@
 			mboxes = <&apcs_glb 12>;
 			mbox-names = "mpss_smem";
 			interrupts = <GIC_SPI 449 IRQ_TYPE_EDGE_RISING>;
+			wakeup-source;
 
 			label = "modem";
 			qcom,glink-label = "mpss";
@@ -1758,7 +1759,8 @@
 				qcom,glink-channels = "IPCRTR";
 				qcom,intents = <0x800  5
 						0x2000 3
-						0x4400 2>;
+						0x4400 2
+						0x10000 1>;
 			};
 
 			qcom,msm_fastrpc_rpmsg {
