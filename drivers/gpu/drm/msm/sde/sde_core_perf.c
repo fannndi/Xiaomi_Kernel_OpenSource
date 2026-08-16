@@ -149,6 +149,15 @@ static void _sde_core_perf_calc_crtc(struct sde_kms *kms,
 		perf->core_clk_rate = kms->perf.fix_core_clk_rate;
 	}
 
+	if (IS_SDMMAGPIE_TARGET(kms->catalog->hwversion)) {
+		perf->max_per_pipe_ib[SDE_POWER_HANDLE_DBUS_ID_MNOC] =
+			SDE_POWER_HANDLE_MNOC_OVERRIDE_IB_QUOTA;
+		perf->max_per_pipe_ib[SDE_POWER_HANDLE_DBUS_ID_LLCC] =
+			SDE_POWER_HANDLE_LLCC_OVERRIDE_IB_QUOTA;
+		perf->max_per_pipe_ib[SDE_POWER_HANDLE_DBUS_ID_EBI] =
+			SDE_POWER_HANDLE_EBI_OVERRIDE_IB_QUOTA;
+	}
+
 	SDE_EVT32(crtc->base.id, perf->core_clk_rate);
 	trace_sde_perf_calc_crtc(crtc->base.id,
 			perf->bw_ctl[SDE_POWER_HANDLE_DBUS_ID_MNOC],
