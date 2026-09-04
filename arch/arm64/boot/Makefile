@@ -68,6 +68,24 @@ $(obj)/Image.lzo: $(obj)/Image FORCE
 $(obj)/Image.gz-dtb: $(obj)/Image.gz $(DTB_OBJS) FORCE
 	$(call if_changed,cat)
 
+# dtbo.img — pack built overlays into a dt_table image.
+# Ported from android-msm-sunfish-4.14 (mkdtimg flow), using the official
+# scripts/mkdtboimg.py from AOSP system/libufdt. Overlays themselves are
+# built by scripts/Makefile.dtbo (always += dtbo) when
+# CONFIG_BUILD_ARM64_DT_OVERLAY=y.
+DTBO_OBJS := $(shell find $(obj)/dts/ -name '*-overlay.dtbo' | sort)
+
+ifneq ($(DTBO_OBJS),)
+quiet_cmd_dtboimg = DTBOIMG $@
+      cmd_dtboimg = python3 $(srctree)/scripts/mkdtboimg.py create $@ \
+                    --page_size=4096 $(DTBO_OBJS)
+
+$(obj)/dtbo.img: $(DTBO_OBJS) FORCE
+	$(call if_changed,dtboimg)
+endif
+
+clean-files += dtbo.img
+
 install:
 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
 	$(obj)/Image System.map "$(INSTALL_PATH)"

@@ -210,6 +210,11 @@ Image-dtb: vmlinux scripts dtbs
 Image.gz-dtb: vmlinux scripts dtbs Image.gz
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
+# dtbo.img (needs CONFIG_BUILD_ARM64_DT_OVERLAY=y)
+PHONY += dtbo.img
+dtbo.img: dtbs
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/dtbo.img
+
 PHONY += vdso_install
 vdso_install:
 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso $@
