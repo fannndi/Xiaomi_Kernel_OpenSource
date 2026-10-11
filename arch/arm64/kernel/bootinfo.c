@@ -2,6 +2,7 @@
  * bootinfo.c
  *
  * Copyright (C) 2011 Xiaomi Ltd.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,9 +18,51 @@
 #include <asm/bootinfo.h>
 #include <linux/bitops.h>
 #include <linux/input/qpnp-power-on.h>
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/cpufreq.h>
+
+#define PMIC_NUM (16)
+static int pmic_v[PMIC_NUM];
+static const char * const poweroff_reasons[POFF_REASON_MAX] = {
+       [POFF_REASON_EVENT_SOFT]                = "soft",
+       [POFF_REASON_EVENT_PS_HOLD]             = "ps_hold",
+       [POFF_REASON_EVENT_PMIC_WD]             = "pmic_wd",
+       [POFF_REASON_EVENT_GP1_KPD1]            = "keypad_reset1",
+       [POFF_REASON_EVENT_GP2_KPD2]            = "keypad_reset2",
+       [POFF_REASON_EVENT_KPDPWR_AND_RESIN]    = "kpdpwr_resin",
+       [POFF_REASON_EVENT_RESIN_N]             = "resin_n",
+       [POFF_REASON_EVENT_KPDPWR_N]            = "kpdpwr_n",
+       [POFF_REASON_EVENT_RESEVER1]            = "resever1",
+       [POFF_REASON_EVENT_RESEVER2]            = "resever2",
+       [POFF_REASON_EVENT_RESEVER3]            = "resever3",
+       [POFF_REASON_EVENT_CHARGER]             = "charger",
+       [POFF_REASON_EVENT_TFT]                 = "tft",
+       [POFF_REASON_EVENT_UVLO]                = "uvlo",
+       [POFF_REASON_EVENT_OTST3]               = "otst3",
+       [POFF_REASON_EVENT_STAGE3]              = "stage3",
+       [POFF_REASON_EVENT_GP_FAULT0]           = "gp_fault0",
+       [POFF_REASON_EVENT_GP_FAULT1]           = "gp_fault1",
+       [POFF_REASON_EVENT_GP_FAULT2]           = "gp_fault2",
+       [POFF_REASON_EVENT_GP_FAULT3]           = "gp_fault3",
+       [POFF_REASON_EVENT_MBG_FAULT]           = "mbg_fault",
+       [POFF_REASON_EVENT_OVLO]                = "ovlo",
+       [POFF_REASON_EVENT_GEN2_UVLO]           = "gen2_uvlo",
+       [POFF_REASON_EVENT_AVDD_RB]             = "avdd_rb",
+       [POFF_REASON_EVENT_RESEVER4]            = "resever4",
+       [POFF_REASON_EVENT_RESEVER5]            = "resever5",
+       [POFF_REASON_EVENT_RESEVER6]            = "resever6",
+       [POFF_REASON_EVENT_FAULT_FAULT_N]       = "fault_n",
+       [POFF_REASON_EVENT_FAULT_PBS_WATCHDOG_TO] = "fault_pbs_watchdog",
+       [POFF_REASON_EVENT_FAULT_PBS_NACK]      = "fault_pbs_nack",
+       [POFF_REASON_EVENT_FAULT_RESTART_PON]   = "fault_restart_pon",
+       [POFF_REASON_EVENT_GEN2_OTST3]          = "otst3",
+       [POFF_REASON_EVENT_RESEVER7]            = "resever7",
+       [POFF_REASON_EVENT_RESEVER8]            = "resever8",
+       [POFF_REASON_EVENT_RESEVER9]            = "resever9",
+       [POFF_REASON_EVENT_RESEVER10]           = "resever10",
+       [POFF_REASON_EVENT_S3_RESET_FAULT_N]    = "s3_reset_fault_n",
+       [POFF_REASON_EVENT_S3_RESET_PBS_WATCHDOG_TO] = "s3_reset_pbs_watchdog",
+       [POFF_REASON_EVENT_S3_RESET_PBS_NACK]   = "s3_reset_pbs_nack",
+       [POFF_REASON_EVENT_S3_RESET_KPDPWR_ANDOR_RESIN] = "s3_reset_kpdpwr_andor_resin",
+};
 
 static const char * const powerup_reasons[PU_REASON_MAX] = {
 	[PU_REASON_EVENT_KPD]		= "keypad",
@@ -144,11 +187,52 @@ static ssize_t powerup_reason_details_show(struct kobject *kobj,
 	return snprintf(buf, 11, "0x%x\n", pu_reason);
 }
 
+void set_poweroff_reason(int pmicv)
+{
+       int i = 0;
+
+       while (i < PMIC_NUM) {
+               if (pmic_v[i] != -1)
+                       i++;
+               else {
+                       pmic_v[i] = pmicv;
+                       break;
+               }
+       }
+}
+
+static ssize_t poweroff_reason_show(struct kobject *kobj,
+                       struct kobj_attribute *attr, char *buf)
+{
+       int i = 0;
+       int l = 0;
+       int v = pmic_v[0];
+
+       if (v == -1)
+               return snprintf(buf, 10, " unknown \n");
+
+       while ((i < PMIC_NUM) && (pmic_v[i] != -1)) {
+               v = pmic_v[i];
+               i++;
+               if (v >= 0 && v < POFF_REASON_MAX)
+                       l += snprintf(buf + l,
+                               (strlen(poweroff_reasons[v]) + 10),
+                               " PNo.%d-%s ", i - 1, poweroff_reasons[v]);
+               else
+                       l += snprintf(buf + l, 17, " PNo.%d-%s ", i - 1, "unknown");
+       }
+       l += snprintf(buf + l, 2, "\n");
+
+       return l;
+}
+
+bootinfo_attr(poweroff_reason);
 bootinfo_attr(powerup_reason);
 bootinfo_attr(powerup_reason_details);
 bootinfo_func_init(u32, powerup_reason, 0);
 
 static struct attribute *g[] = {
+	&poweroff_reason_attr.attr,
 	&powerup_reason_attr.attr,
 	&powerup_reason_details_attr.attr,
 	NULL,
@@ -158,52 +242,22 @@ static struct attribute_group attr_group = {
 	.attrs = g,
 };
 
-static int cpumaxfreq_show(struct seq_file *m, void *v)
-{
-	unsigned int maxfreq, freq;
-	int i;
-
-	maxfreq = cpufreq_quick_get_max(0);
-	for_each_possible_cpu(i) {
-		freq = cpufreq_quick_get_max(i);
-		if (freq > maxfreq)
-			maxfreq = freq;
-	}
-	/* value is used for setting cpumaxfreq */
-	maxfreq /= 10000;
-	seq_printf(m,"%lu.%02lu\n", maxfreq/100, maxfreq%100);
-
-	return 0;
-}
-
-static int cpumaxfreq_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, &cpumaxfreq_show, NULL);
-}
-
-static const struct file_operations proc_cpumaxfreq_operations = {
-	.open       = cpumaxfreq_open,
-	.read       = seq_read,
-	.llseek     = seq_lseek,
-	.release    = seq_release,
-};
-
 static int __init bootinfo_init(void)
 {
 	int ret = -ENOMEM;
 
 	bootinfo_kobj = kobject_create_and_add("bootinfo", NULL);
 	if (bootinfo_kobj == NULL) {
-		pr_err("%s: subsystem_register failed\n", __func__);
+		pr_err("bootinfo_init: subsystem_register failed\n");
 		goto fail;
 	}
 
+	memset(pmic_v, -1, sizeof(pmic_v));
 	ret = sysfs_create_group(bootinfo_kobj, &attr_group);
 	if (ret) {
-		pr_err("%s: subsystem_register failed\n", __func__);
+		pr_err("bootinfo_init: subsystem_register failed\n");
 		goto sys_fail;
 	}
-	proc_create("cpumaxfreq", 0, NULL, &proc_cpumaxfreq_operations);
 
 	return ret;
 
