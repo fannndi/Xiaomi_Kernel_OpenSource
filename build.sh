@@ -2,13 +2,16 @@
 set -euo pipefail
 
 # build.sh — Kernel builder for POCO X3 NFC (surya)
-# Kernel 4.14 (CAF, SM7150) | Toolchain: AOSP Clang + GCC binutils (gaya Pixel/sunfish)
+# Kernel 4.14 (CAF, SM7150)
+# Toolchain: persis Pixel 4a/sunfish (android-msm-sunfish-4.14-android13):
+#   clang-r416183b + aarch64-linux-android-4.9 + arm-linux-androideabi-4.9
 #
 # Pemakaian:
 #   bash build.sh                    # clean build + zip flashable
 #   INCREMENTAL=1 bash build.sh      # incremental (tanpa hapus out/)
 #   PACKAGE=0 bash build.sh          # build kernel saja (tanpa zip)
-#   CLANG_DIR=/path/clang-r383902b bash build.sh
+#   CCACHE=0 bash build.sh           # matikan ccache
+#   CLANG_DIR=/path/ke/clang-rXXXXX bash build.sh   # override toolchain
 #
 # Hasil: build-artifacts/{log.txt,warnings.txt,Image.gz-dtb,dtbo.img} + <nama>.zip
 
@@ -28,12 +31,21 @@ BUILD_START=$(date +%s)
 INCREMENTAL="${INCREMENTAL:-0}"
 PACKAGE="${PACKAGE:-1}"
 WARN_DETAIL="${WARN_DETAIL:-1}"
+OFFLINE="${OFFLINE:-0}"
 
-# Toolchain (AOSP Clang, gaya Pixel/sunfish 4.14)
+# Toolchain — versi persis Pixel 4a/sunfish (android-msm-sunfish-4.14-android13):
+#   clang-r416183b + aarch64-linux-android-4.9 + arm-linux-androideabi-4.9
 TOOLCHAIN_ROOT="${TOOLCHAIN_ROOT:-$HOME/toolchains}"
+CLANG_VERSION="${CLANG_VERSION:-r416183b}"
 CLANG_DIR="${CLANG_DIR:-}"
 GCC64_DIR="${GCC64_DIR:-}"
 GCC32_DIR="${GCC32_DIR:-}"
+CCACHE="${CCACHE:-auto}"
+
+# Sumber prebuilt (mirror AOSP prebuilts — LineageOS GitHub)
+CLANG_REPO="${CLANG_REPO:-https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b}"
+GCC64_REPO="${GCC64_REPO:-https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9}"
+GCC32_REPO="${GCC32_REPO:-https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9}"
 
 # AnyKernel3 packaging
 ANYKERNEL_REPO="${ANYKERNEL_REPO:-https://github.com/fannndi/Kernel_Zip}"
@@ -78,7 +90,7 @@ _on_exit() {
 }
 trap '_on_exit' ERR SIGINT SIGTERM
 
-info "Kernel Builder — POCO X3 NFC (surya) | 4.14 CAF | AOSP Clang (Pixel-style)"
+info "Kernel Builder — POCO X3 NFC (surya) | 4.14 CAF | clang-$CLANG_VERSION + GCC 4.9 (Pixel sunfish)"
 info "Mode: $([[ "$INCREMENTAL" == "1" ]] && echo incremental || echo clean) | jobs=${MAKE_PROCS} | TZ=${TZ}"
 
 # ── Validasi awal ─────────────────────────────────────────────────────────────
@@ -178,34 +190,77 @@ ensure_make_compat() {
     ok "GNU Make 4.3 aktif"
 }
 
-# ── Toolchain (AOSP Clang, gaya Pixel/sunfish 4.14) ──────────────────────────
+# ── Toolchain (Pixel sunfish: clang-r416183b + GCC binutils 4.9) ─────────────
+
+_fetch_prebuilt() {
+    local name="$1" repo="$2" dest="$3" bin="$4"
+    if [[ -x "$dest/bin/$bin" ]]; then
+        debug "Toolchain cached: $name"
+        return 0
+    fi
+    if [[ "$OFFLINE" == "1" ]]; then
+        warn "Offline: $name belum ada di cache ($dest)"
+        return 1
+    fi
+    info "Download toolchain $name (git clone --depth=1)..."
+    local tmp="${dest}.extracting"
+    rm -rf "$tmp"
+    if git clone --depth=1 --quiet "$repo" "$tmp" 2>/dev/null; then
+        rm -rf "$dest"
+        mv "$tmp" "$dest"
+        ok "Toolchain siap: $name"
+        return 0
+    fi
+    rm -rf "$tmp"
+    warn "Gagal download: $repo"
+    return 1
+}
 
 find_toolchains() {
+    mkdir -p "$TOOLCHAIN_ROOT"
+
+    # Clang (Pixel: $CLANG_VERSION)
     if [[ -z "$CLANG_DIR" ]]; then
-        # Preferensi: clang-r353983c (tervalidasi di tree ini), lalu clang terbaru
-        if [[ -x "$TOOLCHAIN_ROOT/clang-r353983c/bin/clang" ]]; then
-            CLANG_DIR="$TOOLCHAIN_ROOT/clang-r353983c"
+        if [[ -x "$TOOLCHAIN_ROOT/clang-$CLANG_VERSION/bin/clang" ]]; then
+            CLANG_DIR="$TOOLCHAIN_ROOT/clang-$CLANG_VERSION"
+        elif _fetch_prebuilt "clang-$CLANG_VERSION" "$CLANG_REPO" "$TOOLCHAIN_ROOT/clang-$CLANG_VERSION" clang; then
+            CLANG_DIR="$TOOLCHAIN_ROOT/clang-$CLANG_VERSION"
         else
             CLANG_DIR="$(find "$TOOLCHAIN_ROOT" -maxdepth 1 -type d -name 'clang-*' 2>/dev/null | sort -V | tail -1 || true)"
+            if [[ -n "$CLANG_DIR" && -x "$CLANG_DIR/bin/clang" ]]; then
+                warn "Fallback clang lokal: $CLANG_DIR"
+            fi
         fi
     fi
     if [[ -z "$CLANG_DIR" || ! -x "$CLANG_DIR/bin/clang" ]]; then
-        err "AOSP clang tidak ditemukan."
-        err "Set CLANG_DIR=/path/ke/clang-rXXXXX (prebuilt clang AOSP)"
+        err "Clang tidak tersedia. Set CLANG_DIR=/path/ke/clang-rXXXXX"
         exit 1
     fi
 
+    # GCC binutils aarch64 (Pixel: aarch64-linux-android-4.9)
     if [[ -z "$GCC64_DIR" ]]; then
-        GCC64_DIR="$(find "$TOOLCHAIN_ROOT" -maxdepth 1 -type d -name 'aarch64-linux-android-*' 2>/dev/null | sort -V | tail -1 || true)"
+        if [[ -x "$TOOLCHAIN_ROOT/aarch64-linux-android-4.9/bin/aarch64-linux-android-gcc" ]]; then
+            GCC64_DIR="$TOOLCHAIN_ROOT/aarch64-linux-android-4.9"
+        elif _fetch_prebuilt "aarch64-linux-android-4.9" "$GCC64_REPO" "$TOOLCHAIN_ROOT/aarch64-linux-android-4.9" aarch64-linux-android-gcc; then
+            GCC64_DIR="$TOOLCHAIN_ROOT/aarch64-linux-android-4.9"
+        else
+            GCC64_DIR="$(find "$TOOLCHAIN_ROOT" -maxdepth 1 -type d -name 'aarch64-linux-android-*' 2>/dev/null | sort -V | tail -1 || true)"
+        fi
     fi
     if [[ -z "$GCC64_DIR" || ! -x "$GCC64_DIR/bin/aarch64-linux-android-gcc" ]]; then
-        err "GCC binutils aarch64 (aarch64-linux-android-4.9) tidak ditemukan."
-        err "Set GCC64_DIR=/path/ke/aarch64-linux-android-4.9"
+        err "GCC binutils aarch64 tidak tersedia. Set GCC64_DIR=/path/ke/aarch64-linux-android-4.9"
         exit 1
     fi
 
+    # GCC binutils arm32 (Pixel: arm-linux-androideabi-4.9)
     if [[ -z "$GCC32_DIR" ]]; then
-        GCC32_DIR="$(find "$TOOLCHAIN_ROOT" -maxdepth 1 -type d -name 'arm-linux-androideabi-*' 2>/dev/null | sort -V | tail -1 || true)"
+        if [[ -x "$TOOLCHAIN_ROOT/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-gcc" ]]; then
+            GCC32_DIR="$TOOLCHAIN_ROOT/arm-linux-androideabi-4.9"
+        elif _fetch_prebuilt "arm-linux-androideabi-4.9" "$GCC32_REPO" "$TOOLCHAIN_ROOT/arm-linux-androideabi-4.9" arm-linux-androideabi-gcc; then
+            GCC32_DIR="$TOOLCHAIN_ROOT/arm-linux-androideabi-4.9"
+        else
+            GCC32_DIR="$(find "$TOOLCHAIN_ROOT" -maxdepth 1 -type d -name 'arm-linux-androideabi-*' 2>/dev/null | sort -V | tail -1 || true)"
+        fi
     fi
     if [[ -n "$GCC32_DIR" && -x "$GCC32_DIR/bin/arm-linux-androideabi-gcc" ]]; then
         ok "GCC32 : $GCC32_DIR"
@@ -225,14 +280,24 @@ setup_env() {
         export PATH="$GCC32_DIR/bin:$PATH"
     fi
     export ARCH="$ARCH"
-    export CC=clang
     export CLANG_TRIPLE=aarch64-linux-gnu-
     export CROSS_COMPILE=aarch64-linux-android-
     export CROSS_COMPILE_ARM32=arm-linux-androideabi-
+    export LD_LIBRARY_PATH="$CLANG_DIR/lib64:${LD_LIBRARY_PATH:-}"
     export HOSTCC=gcc HOSTCXX=g++
     export KBUILD_BUILD_USER="$BUILD_USER"
     export KBUILD_BUILD_HOST="$BUILD_HOST"
-    ok "Environment siap (clang + binutils GCC)"
+
+    # ccache (default: aktif bila tersedia)
+    if [[ "$CCACHE" != "0" ]] && command -v ccache >/dev/null 2>&1; then
+        export CC="ccache clang"
+        export CCACHE_DIR="${CCACHE_DIR:-$HOME/.ccache}"
+        mkdir -p "$CCACHE_DIR"
+        ok "ccache : aktif ($CCACHE_DIR)"
+    else
+        export CC="clang"
+    fi
+    ok "Environment siap (Pixel-style: clang + binutils GCC 4.9)"
 }
 
 MAKE_ARGS=()
@@ -240,7 +305,7 @@ build_make_args() {
     MAKE_ARGS=(
         -j"$MAKE_PROCS" --output-sync=line
         O="$OUTDIR" ARCH="$ARCH"
-        CC=clang CLANG_TRIPLE=aarch64-linux-gnu-
+        CC="$CC" CLANG_TRIPLE=aarch64-linux-gnu-
         CROSS_COMPILE=aarch64-linux-android-
         CROSS_COMPILE_ARM32=arm-linux-androideabi-
         HOSTCC=gcc HOSTCXX=g++
@@ -419,6 +484,7 @@ main() {
     ok "============================================================"
     ok " BUILD SUCCESS — ${KERNEL_NAME}"
     ok " Device : POCO X3 NFC (surya) | SM7150"
+    ok " Toolchain: clang-$CLANG_VERSION + GCC 4.9 (Pixel sunfish style)"
     ok " Kernel : ${krel}"
     ok " Output : build-artifacts/Image.gz-dtb$([[ -s "$OUTDIR/arch/arm64/boot/dtbo.img" ]] && echo ' + dtbo.img')"
     if [[ "$PACKAGE" == "1" && -f "$SCRIPT_DIR/$ZIPNAME" ]]; then
