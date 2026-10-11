@@ -106,9 +106,15 @@ check_deps() {
         sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}" \
             || { err "Gagal install: ${missing[*]}"; exit 1; }
     fi
-    for t in make git tar python3 dtc zip; do
+    for t in make git tar python3 zip; do
         command -v "$t" >/dev/null 2>&1 || { err "Tidak ada: $t"; exit 1; }
     done
+    # dtc sistem opsional — kernel 4.14 build dtc internal (scripts/dtc)
+    if command -v dtc >/dev/null 2>&1; then
+        debug "dtc sistem: $(dtc --version 2>&1 | head -1)"
+    else
+        debug "dtc sistem tidak ada — pakai dtc internal (scripts/dtc)"
+    fi
     ok "Dependencies OK"
 }
 
