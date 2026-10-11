@@ -4,6 +4,7 @@
 #
 
 obj-y   += proc.o
+obj-y	+= mv.o
 
 CFLAGS_task_mmu.o	+= $(call cc-option,-Wno-override-init,)
 proc-y			:= nommu.o task_nommu.o
