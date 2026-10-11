@@ -1119,6 +1119,7 @@ mapped:
 	/* Mapping failed, bail out */
 	if (!bit)
 		return;
+
 	if (device->driver->input_mapped &&
 	    device->driver->input_mapped(device, hidinput, field, usage,
 					 &bit, &max) < 0) {
