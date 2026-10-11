@@ -236,6 +236,7 @@ struct smb_dt_props {
 	int			auto_recharge_vbat_mv;
 	int			wd_bark_time;
 	int			wd_snarl_time_cfg;
+	int			batt_unverify_fcc_ua;
 	int			batt_profile_fcc_ua;
 	int			batt_profile_fv_uv;
 	int			term_current_src;
@@ -540,6 +541,11 @@ static int smb5_parse_dt(struct smb5 *chip)
 			"qcom,fcc-max-ua", &chip->dt.batt_profile_fcc_ua);
 	if (rc < 0)
 		chip->dt.batt_profile_fcc_ua = -EINVAL;
+
+	rc = of_property_read_u32(node,
+			"mi,fcc-batt-unverify-ua", &chip->dt.batt_unverify_fcc_ua);
+	if (rc < 0)
+		chip->dt.batt_unverify_fcc_ua = -EINVAL;
 
 	rc = of_property_read_u32(node,
 				"qcom,fv-max-uv", &chip->dt.batt_profile_fv_uv);
@@ -3001,6 +3007,8 @@ static int smb5_init_hw(struct smb5 *chip)
 		chip->dt.batt_profile_fcc_ua > 0, chip->dt.batt_profile_fcc_ua);
 	vote(chg->fv_votable, HW_LIMIT_VOTER,
 		chip->dt.batt_profile_fv_uv > 0, chip->dt.batt_profile_fv_uv);
+	vote(chg->fcc_votable, BATT_VERIFY_VOTER,
+		chip->dt.batt_unverify_fcc_ua > 0, chip->dt.batt_unverify_fcc_ua);
 	vote(chg->fcc_votable,
 		BATT_PROFILE_VOTER, chg->batt_profile_fcc_ua > 0,
 		chg->batt_profile_fcc_ua);

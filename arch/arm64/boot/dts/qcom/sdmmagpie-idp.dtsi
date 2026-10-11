@@ -449,6 +449,7 @@
 	qcom,usb-icl-ua = <3000000>;
 	qcom,auto-recharge-soc = <99>;
 	qcom,fcc-max-ua = <6000000>;
+	mi,fcc-batt-unverify-ua = <2000000>;
 	qcom,fv-max-uv = <4480000>;
 	qcom,chg-term-src = <1>;
 	qcom,chg-term-current-ma = <(-200)>;

@@ -60,6 +60,7 @@ enum print_reason {
 #define PL_QNOVO_VOTER			"PL_QNOVO_VOTER"
 #define QNOVO_VOTER			"QNOVO_VOTER"
 #define BATT_PROFILE_VOTER		"BATT_PROFILE_VOTER"
+#define BATT_VERIFY_VOTER		"BATT_VERIFY_VOTER"
 #define OTG_DELAY_VOTER			"OTG_DELAY_VOTER"
 #define USBIN_I_VOTER			"USBIN_I_VOTER"
 #define WEAK_CHARGER_VOTER		"WEAK_CHARGER_VOTER"
@@ -569,6 +570,8 @@ struct smb_charger {
 	struct work_struct	moisture_protection_work;
 	struct work_struct	chg_termination_work;
 	struct work_struct	dcin_aicl_work;
+	struct work_struct	batt_verify_update_work;
+	bool			batt_verified;
 	struct delayed_work	ps_change_timeout_work;
 	struct delayed_work	clear_hdc_work;
 	struct delayed_work	icl_change_work;

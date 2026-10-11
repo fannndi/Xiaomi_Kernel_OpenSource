@@ -1295,6 +1295,21 @@ static int smblib_notifier_call(struct notifier_block *nb,
 		if (!chg->bms_psy)
 			chg->bms_psy = psy;
 		if (ev == PSY_EVENT_PROP_CHANGED) {
+#ifdef CONFIG_BATT_VERIFY_BY_DS28E16
+			{
+				union power_supply_propval pval = {0,};
+				int rc;
+
+				rc = power_supply_get_property(chg->bms_psy,
+						POWER_SUPPLY_PROP_AUTHENTIC,
+						&pval);
+				if (rc < 0)
+					pr_err("Couldn't get batt verify status rc=%d\n",
+							rc);
+				chg->batt_verified = pval.intval;
+				schedule_work(&chg->batt_verify_update_work);
+			}
+#endif
 			schedule_work(&chg->bms_update_work);
 		}
 	}
@@ -9578,6 +9593,15 @@ check_next:
 				msecs_to_jiffies(recheck_time));
 }
 
+static void smblib_batt_verify_update_work(struct work_struct *work)
+{
+	struct smb_charger *chg = container_of(work, struct smb_charger,
+			batt_verify_update_work);
+
+	if (chg->batt_verified)
+		vote(chg->fcc_votable, BATT_VERIFY_VOTER, false, 0);
+}
+
 static int smblib_create_votables(struct smb_charger *chg)
 {
 	int rc = 0;
@@ -9755,6 +9779,7 @@ int smblib_init(struct smb_charger *chg)
 	INIT_WORK(&chg->pl_update_work, pl_update_work);
 	INIT_WORK(&chg->jeita_update_work, jeita_update_work);
 	INIT_WORK(&chg->dcin_aicl_work, dcin_aicl_work);
+	INIT_WORK(&chg->batt_verify_update_work, smblib_batt_verify_update_work);
 	INIT_DELAYED_WORK(&chg->clear_hdc_work, clear_hdc_work);
 	INIT_DELAYED_WORK(&chg->icl_change_work, smblib_icl_change_work);
 	INIT_DELAYED_WORK(&chg->pl_enable_work, smblib_pl_enable_work);
@@ -9931,6 +9956,7 @@ int smblib_deinit(struct smb_charger *chg)
 		cancel_work_sync(&chg->jeita_update_work);
 		cancel_work_sync(&chg->pl_update_work);
 		cancel_work_sync(&chg->dcin_aicl_work);
+		cancel_work_sync(&chg->batt_verify_update_work);
 		cancel_delayed_work_sync(&chg->clear_hdc_work);
 		cancel_delayed_work_sync(&chg->icl_change_work);
 		cancel_delayed_work_sync(&chg->pl_enable_work);
