@@ -387,6 +387,7 @@ void __weak arch_suspend_enable_irqs(void)
 //2020.04.27 add longcheer fengxingqiang "Increase the hibernation info of the rpmh subsystem"
 extern void system_sleep_status_print_enabled(void);
 extern void rpmh_status_print_enabled(void);
+extern void regulator_debug_print_enabled(bool only_enabled);
 
 /**
  * suspend_enter - Make the system enter the given sleep state.
@@ -443,6 +444,7 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		goto Enable_cpus;
 	}
 
+	regulator_debug_print_enabled(true);
 //2020.04.27 add longcheer fengxingqiang "Increase the hibernation info of the rpmh subsystem"
 	rpmh_status_print_enabled();
 	system_sleep_status_print_enabled();
