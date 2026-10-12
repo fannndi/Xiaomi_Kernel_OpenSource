@@ -247,16 +247,16 @@ SECTIONS
 	. += PAGE_SIZE;
 #endif
 
+	.bss : {			/* bss segment (rtic)	*/
+         RTIC_BSS
+	}
+
 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
 	_end = .;
 
 	STABS_DEBUG
 
 	HEAD_SYMBOLS
-
-	.bss : {			/* bss segment		*/
-         RTIC_BSS
-	}
 }
 
 /*

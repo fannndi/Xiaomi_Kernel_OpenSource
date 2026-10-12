@@ -277,6 +277,15 @@ AES_ENTRY(aes_ctr_encrypt)
 	umov		x8, v4.d[1]		/* keep swabbed ctr in reg */
 	rev		x8, x8
 #if INTERLEAVE >= 2
+#if INTERLEAVE != 2
+	/* v9 = [1,2,3,0] addends; avoid 128-bit literal (LLVM integrated as) */
+	movi		v9.4s, #0
+	movz		x9, #1
+	movk		x9, #2, lsl #32
+	ins		v9.d[0], x9
+	mov		w9, #3
+	ins		v9.s[2], w9
+#endif
 	cmn		w8, w4			/* 32 bit overflow? */
 	bcs		.Lctrloop
 .LctrloopNx:
@@ -297,10 +306,9 @@ AES_ENTRY(aes_ctr_encrypt)
 	eor		v1.16b, v1.16b, v3.16b
 	st1		{v0.16b-v1.16b}, [x0], #32
 #else
-	ldr		q8, =0x30000000200000001	/* addends 1,2,3[,0] */
 	dup		v7.4s, w8
 	mov		v0.16b, v4.16b
-	add		v7.4s, v7.4s, v8.4s
+	add		v7.4s, v7.4s, v9.4s		/* addends 1,2,3[,0] */
 	mov		v1.16b, v4.16b
 	rev32		v8.16b, v7.16b
 	mov		v2.16b, v4.16b

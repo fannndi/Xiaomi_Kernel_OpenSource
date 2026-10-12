@@ -148,7 +148,8 @@ sub process_objects {
 		} else {
 			STDOUT->autoflush(1);
 			print "$index\n";
-			find_initcalls("$objtree/$object");
+			my $path = ($object =~ m,^/,) ? $object : "$objtree/$object";
+			find_initcalls($path);
 			exit;
 		}
 
@@ -174,6 +175,12 @@ sub find_objects {
 		my $pid = open (my $fh, "\"$ar\" t \"$file\" 2>/dev/null |")
 			or die "$0: failed to execute $ar: $!";
 
+		# Member thin-archive relatif ke direktori arsip, jadi simpan
+		# path-nya relatif ke direktori itu juga.
+		my $dir = $file;
+		$dir =~ s,/[^/]*$,,;
+		$dir = "" if ($dir eq $file);
+
 		my @output;
 
 		while (<$fh>) {
@@ -190,8 +197,10 @@ sub find_objects {
 		}
 
 		# if $ar succeeded, read the list of object files
+		# (member absolut dipakai apa adanya)
 		foreach (@output) {
-			push(@objects, $_);
+			push(@objects, ($_ =~ m,^/,) ? $_ :
+				($dir eq "" ? $_ : "$dir/$_"));
 		}
 	}
 }
