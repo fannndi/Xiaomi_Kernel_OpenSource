@@ -132,5 +132,7 @@ kernel/configs/android-*.cfg
 #
 Android.bp
 out/
+out-*/
 build-artifacts/
 toolchains/
+*.zip
