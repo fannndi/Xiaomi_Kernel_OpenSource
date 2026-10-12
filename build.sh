@@ -5,6 +5,7 @@ set -euo pipefail
 # Kernel 4.14 (CAF, SM7150)
 # Toolchain: persis Pixel 4a/sunfish (android-msm-sunfish-4.14-android13):
 #   clang-r416183b + aarch64-linux-android-4.9 + arm-linux-androideabi-4.9
+#   + dtc prebuilt AOSP via DTC_EXT (untuk overlay dtbo)
 #
 # Pemakaian:
 #   bash build.sh                    # clean build + zip flashable
@@ -46,6 +47,12 @@ CCACHE="${CCACHE:-auto}"
 CLANG_REPO="${CLANG_REPO:-https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b}"
 GCC64_REPO="${GCC64_REPO:-https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9}"
 GCC32_REPO="${GCC32_REPO:-https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9}"
+
+# dtc eksternal — cara Pixel sunfish (build.config.common: DTC_EXT=prebuilts-master/misc/linux-x86/dtc)
+# dtc internal 1.4.4 tidak bisa compile overlay /plugin/ dengan referensi label
+# yang belum terdefinisi (&soc { }), prebuilt AOSP dtc bisa.
+DTC_BIN="${DTC_BIN:-}"
+DTC_URL="${DTC_URL:-https://android.googlesource.com/platform/prebuilts/misc/+/refs/heads/master/linux-x86/dtc/dtc?format=TEXT}"
 
 # AnyKernel3 packaging
 ANYKERNEL_REPO="${ANYKERNEL_REPO:-https://github.com/fannndi/Kernel_Zip}"
@@ -274,6 +281,39 @@ find_toolchains() {
     return 0
 }
 
+fetch_dtc() {
+    # Prioritas: repo-local prebuilts/dtc/dtc, lalu cache di TOOLCHAIN_ROOT
+    if [[ -z "$DTC_BIN" ]]; then
+        if [[ -x "$SCRIPT_DIR/prebuilts/dtc/dtc" ]]; then
+            DTC_BIN="$SCRIPT_DIR/prebuilts/dtc/dtc"
+        else
+            DTC_BIN="$TOOLCHAIN_ROOT/dtc/dtc"
+        fi
+    fi
+    if [[ -x "$DTC_BIN" ]] && "$DTC_BIN" --version >/dev/null 2>&1; then
+        ok "dtc    : $("$DTC_BIN" --version | head -1) ($DTC_BIN)"
+        return 0
+    fi
+    if [[ "$OFFLINE" == "1" ]]; then
+        warn "Offline: dtc eksternal tidak ada di $DTC_BIN"
+        DTC_BIN=""
+        return 1
+    fi
+    info "Download dtc prebuilt AOSP (cara Pixel sunfish)..."
+    mkdir -p "$(dirname "$DTC_BIN")"
+    local tmp="${DTC_BIN}.tmp"
+    if curl -fsSL --connect-timeout 30 --retry 3 "$DTC_URL" | base64 -d > "$tmp" 2>/dev/null \
+        && chmod +x "$tmp" && "$tmp" --version >/dev/null 2>&1; then
+        mv "$tmp" "$DTC_BIN"
+        ok "dtc    : $("$DTC_BIN" --version | head -1) (downloaded)"
+        return 0
+    fi
+    rm -f "$tmp"
+    warn "Gagal download dtc — fallback dtc internal (overlay dtbo bisa gagal)"
+    DTC_BIN=""
+    return 1
+}
+
 setup_env() {
     export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$PATH"
     if [[ -n "$GCC32_DIR" ]]; then
@@ -287,6 +327,11 @@ setup_env() {
     export HOSTCC=gcc HOSTCXX=g++
     export KBUILD_BUILD_USER="$BUILD_USER"
     export KBUILD_BUILD_HOST="$BUILD_HOST"
+
+    # dtc eksternal (Pixel way) — dipakai kernel lewat DTC_EXT
+    if [[ -n "${DTC_BIN:-}" ]]; then
+        export DTC_EXT="$DTC_BIN"
+    fi
 
     # ccache (default: aktif bila tersedia)
     if [[ "$CCACHE" != "0" ]] && command -v ccache >/dev/null 2>&1; then
@@ -312,6 +357,9 @@ build_make_args() {
         KBUILD_BUILD_USER="$BUILD_USER" KBUILD_BUILD_HOST="$BUILD_HOST"
         KBUILD_BUILD_VERSION=1
     )
+    if [[ -n "${DTC_EXT:-}" ]]; then
+        MAKE_ARGS+=(DTC_EXT="$DTC_EXT")
+    fi
 }
 
 # ── Build ─────────────────────────────────────────────────────────────────────
@@ -465,6 +513,7 @@ main() {
     check_deps
     ensure_make_compat
     find_toolchains
+    fetch_dtc || true
     setup_env
     build_make_args
 
